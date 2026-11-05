@@ -11,11 +11,12 @@
     })
     .then(function (html) {
       slot.innerHTML = html;
-      var links = slot.querySelectorAll("a[href]");
+      var links = slot.querySelectorAll("a[href], img[src]");
       for (var i = 0; i < links.length; i++) {
-        var href = links[i].getAttribute("href");
-        if (/^[a-z]+:/i.test(href) || href.charAt(0) === "#") continue;
-        links[i].href = new URL(href, root).href;
+        var attr = links[i].hasAttribute("href") ? "href" : "src";
+        var value = links[i].getAttribute(attr);
+        if (/^[a-z]+:/i.test(value) || value.charAt(0) === "#") continue;
+        links[i].setAttribute(attr, new URL(value, root).href);
       }
     });
 })();
