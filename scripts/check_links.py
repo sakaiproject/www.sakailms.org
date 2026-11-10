@@ -6,7 +6,8 @@ subdirectory (http://localhost:8888/www.sakailms.net/). Redirects are followed;
 the final response must be 200. mailto and tel links are skipped. Facebook,
 Twitter, and Instagram block automated requests, so those Sakai profiles are
 skipped. GoFundMe is skipped because GitHub runners get 502s and timeouts.
-A 429, 502, or timeout is retried before the check fails.
+GitHub URLs are skipped because github.com often returns 503 to automated
+checks. A 429, 502, or timeout is retried before the check fails.
 """
 
 import sys
@@ -67,6 +68,11 @@ class PageParser(HTMLParser):
                 self.refs.append((self.getpos()[0], tag, name, value.strip()))
 
 
+def is_github_host(host):
+    """GitHub.com and its subdomains reject or rate-limit the link checker."""
+    return host == "github.com" or host.endswith(".github.com")
+
+
 def classify(url):
     """Return 'skip', 'external', or 'local', and the URL to request."""
     candidate = "https:" + url if url.startswith("//") else url
@@ -76,7 +82,7 @@ def classify(url):
     if split.scheme in {"http", "https"}:
         host = split.netloc.lower()
         path = split.path.rstrip("/") or "/"
-        if host in SKIP_HOSTS or (host, path.lower()) in SKIP_PROFILES:
+        if host in SKIP_HOSTS or is_github_host(host) or (host, path.lower()) in SKIP_PROFILES:
             return "skip", candidate
         without_fragment = candidate.split("#", 1)[0]
         return "external", without_fragment
