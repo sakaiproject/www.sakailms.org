@@ -391,7 +391,7 @@ body.refresh.connect-page .connect-grid {
 body.refresh .connect-form {
   display: block;
   width: min(100%, 720px);
-  height: 1040px;
+  height: 1240px;
   border: 0;
   border-radius: 16px;
   background: #fff;
