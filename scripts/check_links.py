@@ -3,7 +3,8 @@
 
 Root-absolute links such as /css/site.css break when the site is served from a
 subdirectory (http://localhost:8888/www.sakailms.net/). Redirects are followed;
-the final response must be 200. mailto and tel links are skipped. Facebook,
+the final response must be 200. Links to sakailms.org and sakailms.net are checked
+as files in this tree. mailto and tel links are skipped. Facebook,
 Twitter, and Instagram block automated requests, so those Sakai profiles are
 skipped. GoFundMe is skipped because GitHub runners get 502s and timeouts.
 GitHub URLs are skipped because github.com often returns 503 to automated
@@ -44,6 +45,7 @@ SKIP_PROFILES = {
     ("www.instagram.com", "/sakailms"),
 }
 SKIP_HOSTS = {"gofund.me", "www.gofund.me", "gofundme.com", "www.gofundme.com"}
+SITE_HOSTS = {"sakailms.org", "www.sakailms.org", "sakailms.net", "www.sakailms.net"}
 TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -74,14 +76,19 @@ def is_github_host(host):
 
 
 def classify(url):
-    """Return 'skip', 'external', or 'local', and the URL to request."""
+    """Return 'skip', 'external', 'site', or 'local', and the URL to check."""
     candidate = "https:" + url if url.startswith("//") else url
     split = urlsplit(candidate)
     if split.scheme in SKIP_SCHEMES:
         return "skip", candidate
     if split.scheme in {"http", "https"}:
-        host = split.netloc.lower()
+        host = (split.hostname or "").lower()
         path = split.path.rstrip("/") or "/"
+        if host in SITE_HOSTS:
+            local = split.path or "/"
+            if split.fragment:
+                local = f"{local}#{split.fragment}"
+            return "site", local
         if host in SKIP_HOSTS or is_github_host(host) or (host, path.lower()) in SKIP_PROFILES:
             return "skip", candidate
         without_fragment = candidate.split("#", 1)[0]
@@ -116,15 +123,19 @@ def fetch_status(url):
     return result
 
 
-def locate(page, url):
-    """Return the local file a page-relative URL should open, or an error string."""
+def locate(page, url, *, from_site=False):
+    """Return the local file a URL should open, or an error string."""
     split = urlsplit(url)
     if split.scheme or split.netloc:
-        return None, None
+        return None, "not a local URL"
     raw_path = unquote(split.path)
-    if raw_path.startswith("/"):
-        return None, "root-absolute URL; use a relative path so subdirectory hosting works"
-    base = page.parent
+    if from_site:
+        base = ROOT
+        raw_path = raw_path.lstrip("/")
+    else:
+        if raw_path.startswith("/"):
+            return None, "root-absolute URL; use a relative path so subdirectory hosting works"
+        base = page.parent
     if raw_path in ("", "."):
         target = base
     else:
@@ -166,7 +177,7 @@ def check_html(path, id_cache):
             external.append((target_url, where))
             continue
         where = f"{where} <{tag} {attr}=\"{url}\">"
-        target, detail = locate(path, url)
+        target, detail = locate(path, target_url, from_site=kind == "site")
         if target is None:
             problems.append(f"{where} {detail}")
             continue
