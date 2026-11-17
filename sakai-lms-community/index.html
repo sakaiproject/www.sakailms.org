@@ -405,7 +405,18 @@
   for (var i = 0; i < cards.length; i++) {
     cards[i].addEventListener("click", function () {
       var dialog = document.getElementById(this.getAttribute("aria-controls"));
-      if (dialog && typeof dialog.showModal === "function" && !dialog.open) dialog.showModal();
+      if (!dialog || typeof dialog.showModal !== "function" || dialog.open) return;
+      var y = window.scrollY;
+      dialog.showModal();
+      window.scrollTo(0, y);
+      dialog.addEventListener("close", function () {
+        var pin = function () {
+          if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+          window.scrollTo(0, y);
+        };
+        pin();
+        requestAnimationFrame(pin);
+      }, { once: true });
     });
   }
   var dialogs = document.querySelectorAll(".pmc-dialog");
